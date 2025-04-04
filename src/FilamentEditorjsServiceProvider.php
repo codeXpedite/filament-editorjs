@@ -28,7 +28,6 @@ class FilamentEditorjsServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package->name(static::$name)
-            ->hasRoutes($this->getRoutes())
             ->hasInstallCommand(function (InstallCommand $command) {
                 $command
                     ->publishConfigFile()
@@ -102,16 +101,6 @@ class FilamentEditorjsServiceProvider extends PackageServiceProvider
     protected function getIcons(): array
     {
         return [];
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function getRoutes(): array
-    {
-        return [
-            'filament-editorjs',
-        ];
     }
 
     /**

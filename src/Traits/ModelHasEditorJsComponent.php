@@ -6,6 +6,7 @@ use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 trait ModelHasEditorJsComponent
 {
@@ -46,6 +47,23 @@ trait ModelHasEditorJsComponent
     {
         return $this->addMediaFromRequest('image', $request)
             ->toMediaCollection($this->editorjsMediaCollectionName());
+    }
+
+    /**
+     * Method called from the Livewire component action to save the image from a temporary uploaded file
+     *
+     * @throws FileDoesNotExist
+     * @throws FileIsTooBig
+     */
+    public function editorJsSaveImageFromDisk(TemporaryUploadedFile $file, ?string $fieldName = null): Media
+    {
+        // Use field name for collection if provided, otherwise default
+        $collectionName = $fieldName ?? $this->editorjsMediaCollectionName();
+
+        return $this->addMedia($file->getRealPath())
+            ->usingName($file->getFilename())
+            ->usingFileName($file->getFilename())
+            ->toMediaCollection($collectionName);
     }
 
     /**

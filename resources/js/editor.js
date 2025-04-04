@@ -15,17 +15,37 @@ import DragDrop from "editorjs-drag-drop";
 document.addEventListener("alpine:init", () => {
     Alpine.data(
         "editorjs",
-        ({ state, statePath, placeholder, readOnly, imageUploadEndpoint, tools, minHeight }) => ({
+        ({ state, statePath, placeholder, readOnly, tools, minHeight }) => ({
             instance: null,
             state: state,
             tools: tools,
             init() {
                 const uploadImage = async (blob) => {
-                    const formData = new FormData();
-                    formData.append('image', blob);
-
-                    const response = await axios.post(imageUploadEndpoint, formData);
-                    return response.data;
+                    return new Promise((resolve, reject) => {
+                        // Use Livewire's upload method
+                        this.$wire.upload(
+                            `${statePath}_temp_file`, // Unique property name for temporary upload
+                            blob,
+                            (uploadedFilename) => {
+                                // On successful upload, call a Livewire action to process the temporary file
+                                this.$wire.call('processEditorJsImageUpload', statePath, uploadedFilename)
+                                    .then(result => {
+                                        if (result.success) {
+                                            resolve(result); // Resolve with { success: 1, file: { url: '...', media_id: ... } }
+                                        } else {
+                                            reject('Upload processing failed');
+                                        }
+                                    })
+                                    .catch(error => reject(error));
+                            },
+                            () => { // Error callback
+                                reject('Upload failed');
+                            },
+                            (event) => { // Progress callback (optional)
+                                // console.log('Upload progress:', event.detail.progress);
+                            }
+                        );
+                    });
                 };
 
                 let enabledTools = {};
@@ -43,11 +63,14 @@ document.addEventListener("alpine:init", () => {
                             uploader: {
                                 uploadByFile: uploadImage,
                                 uploadByUrl: async (url) => {
+                                    // Re-use the uploadByFile logic after fetching the blob
                                     try {
                                         const res = await fetch(url);
                                         const blob = await res.blob();
-                                        return uploadImage(blob);
-                                    } catch {
+                                        // Ensure the uploadImage promise resolves/rejects correctly here
+                                        return await uploadImage(blob);
+                                    } catch (error) {
+                                        console.error('Error uploading by URL:', error);
                                         return {
                                             success: 0,
                                         };

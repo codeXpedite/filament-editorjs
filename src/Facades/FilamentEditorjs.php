@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Facade;
  */
 class FilamentEditorjs extends Facade
 {
-    protected static function getFacadeAccessor()
+    protected static function getFacadeAccessor(): string
     {
         return \Athphane\FilamentEditorjs\FilamentEditorjs::class;
     }
