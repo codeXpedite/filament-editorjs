@@ -5,9 +5,17 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/athphane/filament-editorjs/fix-php-code-styling.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/athphane/filament-editorjs/actions?query=workflow%3A"Fix+PHP+code+styling"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/athphane/filament-editorjs.svg?style=flat-square)](https://packagist.org/packages/athphane/filament-editorjs)
 
-An EditorJS field for Filament, with support for image uploads using Spatie's Media Library package.
+An EditorJS field for Filament v3, with integrated image uploads using Spatie's Media Library package and `filament/spatie-laravel-media-library-plugin`.
 
 ![img.png](assets/img.png)
+
+## Requirements
+
+- PHP 8.3+
+- Laravel 11.x+
+- Filament 3.2+
+- Spatie Media Library 11.9+
+- `filament/spatie-laravel-media-library-plugin` 3.3+
 
 ## Installation
 
@@ -17,19 +25,21 @@ You can install the package via composer:
 composer require athphane/filament-editorjs
 ```
 
-You can publish the config file with:
+Optionally, you can publish the config file with:
 
 ```bash
 php artisan vendor:publish --tag="filament-editorjs-config"
 ```
 
-Optionally, you can publish the views using
+Alternatively, you can run the install command:
 
 ```bash
-php artisan vendor:publish --tag="filament-editorjs-views"
+php artisan filament-editorjs:install
 ```
 
-This is the contents of the published config file:
+This command will publish the configuration file and ask you to star the repository on GitHub.
+
+This is the contents of the published config file (`config/filament-editorjs.php`):
 
 ```php
 return [
@@ -69,59 +79,73 @@ return [
 ```
 
 ## Usage
-This package requires you to do some initial setup before you can use it. 
 
-This package uses EditorJS and integrates the Image Upload Plugin with Spatie's Media Library package. For this reason,
-you will need to set up your models to use the Media Library package.
+This package requires Spatie's Media Library package to be installed and configured. Please follow the installation instructions for [spatie/laravel-medialibrary](https://spatie.be/docs/laravel-medialibrary/v11/installation-setup) and [filament/spatie-laravel-media-library-plugin](https://filamentphp.com/plugins/spatie-media-library) if you haven't already.
 
 ### Setting up models
 
-First of all, you need somewhere to store the content for the editorjs field itself. This package assumes that you will
-have a NULLABLE `content` column of type json in your database table. This column will be used to store the content for the editorjs field.
+First, you need a place to store the EditorJS content. This package assumes you have a NULLABLE `content` column of type `JSON` in your database table.
 
-Your model must implement the `Spatie\MediaLibrary\HasMedia` interface, and use the `Spatie\MediaLibrary\InteractsWithMedia` trait.
+Your model must implement the `Spatie\MediaLibrary\HasMedia` interface and use the `Spatie\MediaLibrary\InteractsWithMedia` trait.
 
-Next, you must use this package's `Athphane\FilamentEditorjs\Traits\ModelHasEditorJsComponent` trait in your model. This
-trait offers a couple of methods to help you set up your model to work with the editorjs field.
+Next, you must use this package's `Athphane\FilamentEditorjs\Traits\ModelHasEditorJsComponent` trait in your model. This trait provides helper methods for integrating with the EditorJS field.
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Athphane\FilamentEditorjs\Traits\ModelHasEditorJsComponent;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+class YourModel extends Model implements HasMedia
+{
+    use InteractsWithMedia;
+    use ModelHasEditorJsComponent; // Add this trait
+
+    protected $casts = [
+        'content' => 'array', // Cast the content field to array
+    ];
+
+    // ... other model properties and methods
+
+    /**
+     * Register the media collections needed for the editorjs field.
+     */
+    public function registerMediaCollections(): void
+    {
+        // Call the helper method from the trait
+        $this->registerEditorJsMediaCollections();
+
+        // You can add other media collections here if needed
+    }
+
+    /**
+     * Register the media conversions needed for the editorjs field.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        // Call the helper method from the trait
+        $this->registerEditorJsMediaConversions($media);
+
+        // You can add other media conversions here if needed
+    }
+}
+```
 
 #### Changing the default column name for the content field
-The package assumes that you will use a column named `content` to store the content. If you want to use a different column name, 
-you can go ahead and change the column name. Then on your model, you must override the `editorJsContentFieldName` method to return 
-the new name of the column.
+The package assumes you use a column named `content`. If you want to use a different name (e.g., `body_json`), override the `editorJsContentFieldName` method in your model:
 
 ```php
-/**
- * The name of the field that contains the content for the editorjs field
- */
 public function editorJsContentFieldName(): string
 {
-    return 'new_column_name';
+    return 'body_json'; // Return your custom column name
 }
 ```
 
-#### Registering the media collections and conversions
-As this packages main aim is to integrate with Spatie's Media Library package, you will need to register the media collections
-for the editorjs media collection. Normally, you would do this in your model's own `registerMediaCollections` and `registerMediaConversions` methods.
-However, this package offers a convenience method to do that for you.
-
-The `ModelHasEditorJsComponent` trait offers the methods `registerEditorJsMediaCollections` and `registerEditorjsMediaConversions`. 
-This method can be used in the `registerMediaCollection` and `registerMediaConversions` method of your own model as follows:
-
-```php
-public function registerMediaCollections(): void
-{
-    $this->registerEditorJsMediaCollections();
-}
-
-public function registerMediaConversions(?Media $media = null): void
-{
-    $this->registerEditorJsMediaConversions($media);
-}
-```
+Don't forget to update the `$casts` property accordingly.
 
 #### Settings up allowed mime types for the editorjs media collection
-By default, the package will allow a set of mime types defined in the config file of the package. 
-You can change this by updating the config file values, or by programmatically setting the mime types on the `registerEditorJsMediaCollections`
+By default, the allowed mime types are taken from the `filament-editorjs.php` config file. You can override this per model when calling `registerEditorJsMediaCollections`:
 
 ```php
 public function registerMediaCollections(): void
@@ -129,19 +153,12 @@ public function registerMediaCollections(): void
     $this->registerEditorJsMediaCollections(mime_types: [
         'image/jpeg',
         'image/png',
-        'image/gif',
-        'image/tiff',
-        'image/x-citrix-png',
-        'image/x-png',
-        'image/svg+xml',
-        'image/svg',
     ]);
 }
 ````
 
-#### Enabling/Disabling the responsive images generation
-By default, the package will generate responsive images for the editorjs media collection. 
-You can disable this by passing `false` on the $generate_responsive_images argument to the `registerEditorJsMediaCollections` method.
+#### Enabling/Disabling responsive images generation
+Responsive images are generated by default. You can disable this by passing `false` to the `registerEditorJsMediaCollections` method:
 
 ```php
 public function registerMediaCollections(): void
@@ -151,62 +168,35 @@ public function registerMediaCollections(): void
 ```
 
 #### Modifying the default media collection name
-By default, the package will use the `content_images` media collection name. 
-You can change this by overriding the `editorjsMediaCollectionName` method.
+The default media collection name is `content_images`. To change this, override the `editorjsMediaCollectionName` method in your model:
 
 ```php
-/**
- * The name of the media collection for the editorjs media collection
- */
 public function editorjsMediaCollectionName(): string
 {
-    return 'new_media_collection_name';
+    return 'editor_uploads'; // Return your custom collection name
 }
 ```
 
-### Setting up the editorjs field
+### Setting up the editorjs field in your Filament Resource
 
-Now that you have set up your model to work with the editorjs field, you can set up the editorjs field itself.
+Use the `Athphane\FilamentEditorjs\Forms\Components\EditorjsTextField` component in your form definition:
 
-This package provides a `EditorjsTextField` component. You can use that directly in your form definition like this:
 ```php
+use Athphane\FilamentEditorjs\Forms\Components\EditorjsTextField;
+use Filament\Forms\Form;
+
 public static function form(Form $form): Form
 {
     return $form
         ->schema([
-            EditorjsTextField::make('content')
-                ->placeholder('Start writing...'),
+            // ... other fields
+            EditorjsTextField::make('content') // Use the same name as your database column
+                ->columnSpanFull()
+                ->profile('default') // Optional: specify a tool profile from config
+                ->minHeight(150), // Optional: set minimum height
         ]);
 }
 ```
-
-#### Configuring axios to successfully upload images
-This package comes with some javascript code that will upload the image to the server. 
-Usually you would have something like this in your `boostrap.js` file:
-
-```js
-import axios from 'axios';
-
-window.axios = axios;
-
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-```
-
-This piece of javascript code, as far as I know, allows frontend code to upload files to the Laravel backend. 
-Something to do with CSRF protection.
-
-Because of this, you will need to define the following Filament Render hook in your application's `AppServiceProvider`;
-
-```php
-FilamentView::registerRenderHook(
-    PanelsRenderHook::HEAD_END,
-    fn(): string => Blade::render('@vite(\'resources/js/app.js\')'),
-);
-```
-
-> This also assumes that you have set up your project's vite configuration correctly.
-
-> We're using the app.js file cause the bootstrap.js file is simply included in the app.js file. 
 
 ## Testing
 
